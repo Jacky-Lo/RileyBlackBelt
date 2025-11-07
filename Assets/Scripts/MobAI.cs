@@ -25,7 +25,6 @@ public class MobAI : MonoBehaviour
     [Header("Chase Settings")]
     public float chaseSpeed = 4f;
     public float attackRange = 1f; // Horizontal distance at which the enemy stops and attacks
-    public float attackVerticalTolerance = 1.5f; // Maximum vertical distance difference to allow attack (if player is higher than this, don't attack)
     public float attackDelay = 1f; // Delay before attacking
 
     // Hurt settings
@@ -57,18 +56,35 @@ public class MobAI : MonoBehaviour
 
     void Start()
     {
+        Debug.Log($"[MobAI] *** START CALLED *** Enemy: {gameObject.name}");
+        
         // Get required components
         animator = GetComponent<Animator>();
         rb = GetComponent<Rigidbody2D>();
+        
+        if (animator == null)
+        {
+            Debug.LogError($"[MobAI] Animator component not found on {gameObject.name}!");
+        }
+        if (rb == null)
+        {
+            Debug.LogError($"[MobAI] Rigidbody2D component not found on {gameObject.name}!");
+        }
 
         // Disable attack trigger initially
         if (attackTrigger != null)
         {
             attackTrigger.enabled = false;
         }
+        else
+        {
+            Debug.LogWarning($"[MobAI] Attack trigger not assigned on {gameObject.name}!");
+        }
 
         // Set initial animation state
         UpdateAnimationState();
+        
+        Debug.Log($"[MobAI] MobAI initialized for {gameObject.name}. AttackRange: {attackRange}, ChaseSpeed: {chaseSpeed}");
     }
 
     void Update()
@@ -112,9 +128,11 @@ public class MobAI : MonoBehaviour
 
             if (attackTimer >= attackDelay)
             {
+                Debug.Log($"[MobAI] Attack delay reached ({attackTimer} >= {attackDelay}), calling AttackPlayer()");
                 AttackPlayer();
                 attackTimer = 0f;
-                isAttacking = false;
+                // Keep isAttacking = true until ResetAttackAnimation is called
+                // This prevents multiple calls to AttackPlayer() during the same attack
             }
         }
         else if (isChasing && !isHurt)
@@ -126,11 +144,17 @@ public class MobAI : MonoBehaviour
             }
             else
             {
+                Debug.Log($"[MobAI] Update: Calling ChasePlayer(). isChasing={isChasing}, playerTransform={playerTransform.name}");
                 ChasePlayer();
             }
         }
         else if (!isHurt)
         {
+            // Debug why we're not chasing (only log occasionally to avoid spam)
+            if (Time.frameCount % 120 == 0) // Log every 2 seconds
+            {
+                Debug.Log($"[MobAI] Update: Patrolling. isChasing={isChasing}, isHurt={isHurt}, isAttacking={isAttacking}, playerTransform={(playerTransform != null ? playerTransform.name : "null")}");
+            }
             Patrol();
         }
     }
@@ -167,35 +191,14 @@ public class MobAI : MonoBehaviour
             return;
         }
 
-        // Calculate distances to the player
+        // Calculate horizontal distance to the player
         float horizontalDistance = Mathf.Abs(playerTransform.position.x - transform.position.x);
-        float verticalDistance = playerTransform.position.y - transform.position.y;
+        
+        Debug.Log($"[MobAI] ChasePlayer: horizontalDistance={horizontalDistance}, attackRange={attackRange}");
 
-        // If player is too high above the enemy AND within attack range, don't attack but keep chasing
-        // The enemy will continue tracking but won't attack until player comes down
-        if (verticalDistance > attackVerticalTolerance && horizontalDistance <= attackRange)
+        // If within attack range, stop and prepare to attack
+        if (horizontalDistance <= attackRange)
         {
-            // Player is above and within attack range, don't attack but continue tracking
-            // Face the player
-            float direction = (playerTransform.position.x - transform.position.x);
-            if ((direction > 0 && !movingRight) || (direction < 0 && movingRight))
-            {
-                Flip();
-            }
-            
-            rb.velocity = Vector2.zero; // Stop moving since we're in attack range
-            animator.SetBool(isRunningBool, false);
-            animator.SetBool(isIdleBool, true);
-            return; // Don't attack, but keep isChasing = true so we continue tracking
-        }
-
-        // If within attack range and on same level (or slightly below), stop and prepare to attack
-        // Allow attack if player is at same level OR below (negative vertical distance is always OK)
-        // Only prevent attack if player is significantly above (more than tolerance)
-        if (horizontalDistance <= attackRange && (verticalDistance <= attackVerticalTolerance || verticalDistance < 0))
-        {
-            Debug.Log($"[MobAI] Attack conditions met! Horizontal: {horizontalDistance}, Vertical: {verticalDistance}, AttackRange: {attackRange}, Tolerance: {attackVerticalTolerance}");
-            
             // Face the player before attacking
             float direction = (playerTransform.position.x - transform.position.x);
             if ((direction > 0 && !movingRight) || (direction < 0 && movingRight))
@@ -204,26 +207,24 @@ public class MobAI : MonoBehaviour
             }
 
             rb.velocity = Vector2.zero; // Stop moving
-            animator.SetBool(isRunningBool, false);
-            animator.SetBool(isIdleBool, true);
-
-            // Trigger attack after a delay
+            
+            // Only start attack sequence if not already attacking
             if (!isAttacking)
             {
-                Debug.Log("[MobAI] Setting isAttacking to true");
+                Debug.Log($"[MobAI] Attack conditions met! Horizontal: {horizontalDistance}, AttackRange: {attackRange}");
+                animator.SetBool(isRunningBool, false);
+                animator.SetBool(isIdleBool, true);
+                
+                // Start attack sequence
+                Debug.Log("[MobAI] Setting isAttacking to true - player is in attack range");
                 isAttacking = true;
                 attackTimer = 0f; // Reset timer when starting attack
             }
+            // If already attacking, the attack state will handle it
         }
         else
         {
-            // Debug why attack isn't happening (only log occasionally to avoid spam)
-            if (horizontalDistance <= attackRange && Time.frameCount % 60 == 0) // Log every 60 frames
-            {
-                Debug.Log($"[MobAI] Within horizontal range ({horizontalDistance} <= {attackRange}) but vertical check failed: {verticalDistance} > {attackVerticalTolerance}");
-            }
-            
-            // Otherwise, continue chasing
+            // Player is not in attack range, continue chasing
             float direction = (playerTransform.position.x - transform.position.x);
             float horizontalMovement = direction > 0 ? chaseSpeed : -chaseSpeed;
 
@@ -276,10 +277,31 @@ public class MobAI : MonoBehaviour
         }
 
         // Trigger the attack animation
-        animator.SetBool(isAttackingBool, true);
+        // Try setting the bool first
+        if (!string.IsNullOrEmpty(isAttackingBool))
+        {
+            animator.SetBool(isAttackingBool, true);
+            Debug.Log($"[MobAI] Set animator bool {isAttackingBool} to true");
+        }
+        
+        // Also try common trigger names in case the animator uses triggers
+        try
+        {
+            animator.SetTrigger("Attack");
+            Debug.Log("[MobAI] Set Attack trigger");
+        }
+        catch { }
+        
+        try
+        {
+            animator.SetTrigger("IsAttacking");
+            Debug.Log("[MobAI] Set IsAttacking trigger");
+        }
+        catch { }
+        
         animator.SetBool(isIdleBool, false);
         
-        Debug.Log("[MobAI] Attack animation triggered! isAttackingBool set to true");
+        Debug.Log("[MobAI] Attack animation parameters set! Check animator for correct parameter name.");
 
         // Optionally, you can add logic here to deal damage to the player
         // Debug.Log("Enemy is attacking the player!");
@@ -290,15 +312,29 @@ public class MobAI : MonoBehaviour
 
     void ResetAttackAnimation()
     {
+        Debug.Log("[MobAI] ResetAttackAnimation() called - attack animation finished");
+        
         // Reset the attack animation state
         animator.SetBool(isAttackingBool, false);
-        animator.SetBool(isIdleBool, true);
         
         // Ensure attack trigger is disabled
         if (attackTrigger != null)
         {
             attackTrigger.enabled = false;
         }
+        
+        // Reset isAttacking flag so we can attack again if player is still in range
+        isAttacking = false;
+        
+        // Don't reset isChasing here - let OnTriggerStay2D maintain it
+        // If player is still in range, ChasePlayer() will immediately start a new attack
+        // Only reset animation state if we're not chasing
+        if (!isChasing || playerTransform == null)
+        {
+            animator.SetBool(isIdleBool, true);
+            animator.SetBool(isRunningBool, false);
+        }
+        // Otherwise, ChasePlayer() will handle the animation state in the next Update()
     }
 
     // Animation Event Methods - Called by Animation Events
@@ -320,6 +356,8 @@ public class MobAI : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
+        Debug.Log($"[MobAI] *** OnTriggerEnter2D CALLED *** GameObject: {other.gameObject.name}, Tag: {other.gameObject.tag}");
+        
         if (other.gameObject.tag == "Enemy" || other.gameObject.tag == "Player") {
             gameObject.GetComponent<PolygonCollider2D>().enabled = false;
             other.gameObject.GetComponent<PolygonCollider2D>().enabled = false;
@@ -328,12 +366,12 @@ public class MobAI : MonoBehaviour
         // Check if the colliding object is the Chase trigger (PlayerAttraction)
         if (other.CompareTag("Chase"))
         {
-            Debug.Log($"[MobAI] OnTriggerEnter2D: Chase tag detected! GameObject: {other.gameObject.name}");
+            Debug.Log($"[MobAI] *** CHASE TAG DETECTED! *** GameObject: {other.gameObject.name}");
             // Get the player transform (parent of the Chase object)
             Transform player = other.transform.parent;
             if (player != null)
             {
-                Debug.Log($"[MobAI] Player parent found: {player.name}, setting up chase. isChasing will be set to true");
+                Debug.Log($"[MobAI] *** PLAYER PARENT FOUND: {player.name} *** Setting isChasing = true");
                 playerTransform = player;
                 isChasing = true;
                 
@@ -417,21 +455,24 @@ public class MobAI : MonoBehaviour
             if (player != null)
             {
                 // Continuously update player position and ensure we're still chasing
+                // This ensures chase state persists as long as player is in detection area
+                if (!isChasing)
+                {
+                    Debug.Log($"[MobAI] *** OnTriggerStay2D: Setting isChasing = true for {player.name} ***");
+                }
                 playerTransform = player;
                 isChasing = true;
                 
-                // Face the player while chasing
-                float direction = (player.position.x - transform.position.x);
-                if ((direction > 0 && !movingRight) || (direction < 0 && movingRight))
-                {
-                    Flip();
-                }
-                
-                // Only update animation if not attacking
+                // Don't interfere with attack animations - let ChasePlayer() handle movement and facing during attacks
+                // Only update animation states if not currently attacking
                 if (!isAttacking)
                 {
-                    animator.SetBool(isRunningBool, true);
-                    animator.SetBool(isIdleBool, false);
+                    // Face the player while chasing (but not during attack)
+                    float direction = (player.position.x - transform.position.x);
+                    if ((direction > 0 && !movingRight) || (direction < 0 && movingRight))
+                    {
+                        Flip();
+                    }
                 }
                 
                 PolygonCollider2D polyCollider = gameObject.GetComponent<PolygonCollider2D>();
@@ -461,10 +502,13 @@ public class MobAI : MonoBehaviour
         // Check if the exiting object is the Chase trigger (PlayerAttraction)
         if (other.CompareTag("Chase"))
         {
+            Debug.Log("[MobAI] Chase object exited detection area - stopping chase");
             playerTransform = null;
             isChasing = false;
+            isAttacking = false; // Stop any ongoing attacks
             animator.SetBool(isRunningBool, false);
             animator.SetBool(isIdleBool, true);
+            animator.SetBool(isAttackingBool, false);
             return; // Exit early to avoid checking other tags
         }
         
