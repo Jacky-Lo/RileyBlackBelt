@@ -25,7 +25,7 @@ public class MobAI : MonoBehaviour
     [Header("Chase Settings")]
     public float chaseSpeed = 4f;
     public float attackRange = 1f; // Horizontal distance at which the enemy stops and attacks
-    public float attackVerticalTolerance = 0.5f; // Maximum vertical distance difference to allow attack (if player is higher than this, don't attack)
+    public float attackVerticalTolerance = 1.5f; // Maximum vertical distance difference to allow attack (if player is higher than this, don't attack)
     public float attackDelay = 1f; // Delay before attacking
 
     // Hurt settings
@@ -190,8 +190,12 @@ public class MobAI : MonoBehaviour
         }
 
         // If within attack range and on same level (or slightly below), stop and prepare to attack
-        if (horizontalDistance <= attackRange && verticalDistance <= attackVerticalTolerance)
+        // Allow attack if player is at same level OR below (negative vertical distance is always OK)
+        // Only prevent attack if player is significantly above (more than tolerance)
+        if (horizontalDistance <= attackRange && (verticalDistance <= attackVerticalTolerance || verticalDistance < 0))
         {
+            Debug.Log($"[MobAI] Attack conditions met! Horizontal: {horizontalDistance}, Vertical: {verticalDistance}, AttackRange: {attackRange}, Tolerance: {attackVerticalTolerance}");
+            
             // Face the player before attacking
             float direction = (playerTransform.position.x - transform.position.x);
             if ((direction > 0 && !movingRight) || (direction < 0 && movingRight))
@@ -206,11 +210,19 @@ public class MobAI : MonoBehaviour
             // Trigger attack after a delay
             if (!isAttacking)
             {
+                Debug.Log("[MobAI] Setting isAttacking to true");
                 isAttacking = true;
+                attackTimer = 0f; // Reset timer when starting attack
             }
         }
         else
         {
+            // Debug why attack isn't happening (only log occasionally to avoid spam)
+            if (horizontalDistance <= attackRange && Time.frameCount % 60 == 0) // Log every 60 frames
+            {
+                Debug.Log($"[MobAI] Within horizontal range ({horizontalDistance} <= {attackRange}) but vertical check failed: {verticalDistance} > {attackVerticalTolerance}");
+            }
+            
             // Otherwise, continue chasing
             float direction = (playerTransform.position.x - transform.position.x);
             float horizontalMovement = direction > 0 ? chaseSpeed : -chaseSpeed;
@@ -251,6 +263,8 @@ public class MobAI : MonoBehaviour
 
     void AttackPlayer()
     {
+        Debug.Log("[MobAI] AttackPlayer() called!");
+        
         // Ensure enemy is facing the player before attacking
         if (playerTransform != null)
         {
@@ -264,6 +278,8 @@ public class MobAI : MonoBehaviour
         // Trigger the attack animation
         animator.SetBool(isAttackingBool, true);
         animator.SetBool(isIdleBool, false);
+        
+        Debug.Log("[MobAI] Attack animation triggered! isAttackingBool set to true");
 
         // Optionally, you can add logic here to deal damage to the player
         // Debug.Log("Enemy is attacking the player!");

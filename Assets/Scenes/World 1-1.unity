@@ -1718,6 +1718,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: FighterPlayer
       objectReference: {fileID: 0}
+    - target: {fileID: 2856875574234376033, guid: cc9d4245647fe884396e693ce371f169, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2856875574234376034, guid: cc9d4245647fe884396e693ce371f169, type: 3}
       propertyPath: manaSlider
       value: 
@@ -10904,6 +10908,10 @@ PrefabInstance:
     - target: {fileID: 1591684294703458590, guid: 179e1231961d07849a482727256d612d, type: 3}
       propertyPath: m_Name
       value: Wizard Player
+      objectReference: {fileID: 0}
+    - target: {fileID: 1591684294703458590, guid: 179e1231961d07849a482727256d612d, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1591684294703458784, guid: 179e1231961d07849a482727256d612d, type: 3}
       propertyPath: manaSlider
