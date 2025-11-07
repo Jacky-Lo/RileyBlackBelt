@@ -287,17 +287,39 @@ public class Controller : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        Debug.Log("I took damage.");
-        if (other.gameObject.transform.parent.GetComponent<MobAI>())
+        // Check for MobAI attacks
+        MobAI mobAI = other.gameObject.transform.parent != null ? other.gameObject.transform.parent.GetComponent<MobAI>() : null;
+        if (mobAI == null)
         {
-            TakeDamage(other.gameObject.transform.parent.GetComponent<MobAI>().Damage);
+            mobAI = other.gameObject.GetComponent<MobAI>();
         }
-        else if (other.gameObject.GetComponent<MobAI>()) {
-            TakeDamage(other.gameObject.GetComponent<MobAI>().Damage);
-        }
-        else if (other.gameObject.transform.parent.GetComponent<BossAI>())
+        
+        if (mobAI != null)
         {
-            TakeDamage(other.gameObject.transform.parent.GetComponent<BossAI>().Damage);
+            // Only take damage if the enemy's attack trigger is active and this is the attack trigger collider
+            if (mobAI.attackTrigger != null && other == mobAI.attackTrigger && mobAI.attackTrigger.enabled)
+            {
+                Debug.Log("I took damage from enemy attack.");
+                TakeDamage(mobAI.Damage);
+            }
+            return; // Exit early to avoid checking BossAI if we already found MobAI
+        }
+
+        // Check for BossAI attacks
+        BossAI bossAI = other.gameObject.transform.parent != null ? other.gameObject.transform.parent.GetComponent<BossAI>() : null;
+        if (bossAI == null)
+        {
+            bossAI = other.gameObject.GetComponent<BossAI>();
+        }
+        
+        if (bossAI != null)
+        {
+            // Only take damage if the boss's attack trigger is active and this is the attack trigger collider
+            if (bossAI.attackTrigger != null && other == bossAI.attackTrigger && bossAI.attackTrigger.enabled)
+            {
+                Debug.Log("I took damage from boss attack.");
+                TakeDamage(bossAI.Damage);
+            }
         }
     }
     

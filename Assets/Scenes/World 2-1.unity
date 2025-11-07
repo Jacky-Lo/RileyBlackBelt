@@ -3848,6 +3848,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PlayerRanger (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 6726996225036445403, guid: 38c45d63b7a4fab4b8a9bef0690ff7c6, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6726996225036445406, guid: 38c45d63b7a4fab4b8a9bef0690ff7c6, type: 3}
       propertyPath: m_LocalPosition.x
       value: 300.15

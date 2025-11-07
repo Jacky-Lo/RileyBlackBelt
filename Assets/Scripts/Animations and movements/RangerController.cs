@@ -304,18 +304,39 @@ public class RangerController : MonoBehaviour
     }
     private void OnTriggerEnter2D(Collider2D other)
     {
-        Debug.Log("I took damage.");
-        if (other.gameObject.GetComponentInParent<MobAI>() != null)
+        // Check for MobAI attacks
+        MobAI mobAI = other.gameObject.GetComponentInParent<MobAI>();
+        if (mobAI == null)
         {
-            TakeDamage(other.gameObject.GetComponentInParent<MobAI>().Damage);
+            mobAI = other.gameObject.GetComponent<MobAI>();
         }
-        if (other.gameObject.GetComponent<MobAI>() != null)
+        
+        if (mobAI != null)
         {
-            TakeDamage(other.gameObject.GetComponent<MobAI>().Damage);
+            // Only take damage if the enemy's attack trigger is active and this is the attack trigger collider
+            if (mobAI.attackTrigger != null && other == mobAI.attackTrigger && mobAI.attackTrigger.enabled)
+            {
+                Debug.Log("I took damage from enemy attack.");
+                TakeDamage(mobAI.Damage);
+            }
+            return; // Exit early to avoid checking BossAI if we already found MobAI
         }
-        if (other.gameObject.GetComponentInParent<BossAI>() != null)
+
+        // Check for BossAI attacks
+        BossAI bossAI = other.gameObject.GetComponentInParent<BossAI>();
+        if (bossAI == null)
         {
-            TakeDamage(other.gameObject.GetComponentInParent<BossAI>().Damage);
+            bossAI = other.gameObject.GetComponent<BossAI>();
+        }
+        
+        if (bossAI != null)
+        {
+            // Only take damage if the boss's attack trigger is active and this is the attack trigger collider
+            if (bossAI.attackTrigger != null && other == bossAI.attackTrigger && bossAI.attackTrigger.enabled)
+            {
+                Debug.Log("I took damage from boss attack.");
+                TakeDamage(bossAI.Damage);
+            }
         }
     }
 
